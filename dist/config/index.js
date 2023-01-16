@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PORT = exports.ORIGIN = exports.LOG_FORMAT = exports.NODE_ENV = exports.SECRET_KEY = exports.LOG_DIR = exports.PDB_PASSWORD = exports.PDB_USER = exports.PDB_HOST = exports.PDB_PORT = exports.PDB_NAME = exports.db_password = exports.db_user = exports.db_host = exports.db_name = exports.DB_PORT = exports.node_env = exports.CREDENTIALS = void 0;
 const dotenv_1 = require("dotenv");
-(0, dotenv_1.config)({ path: `.env.${process.env.NODE_ENV || 'development'}.local` });
+(0, dotenv_1.config)({ path: `.env` });
 exports.CREDENTIALS = process.env.CREDENTIALS === 'true';
 // export const { NODE_ENV, PORT, SECRET_KEY, LOG_FORMAT, LOG_DIR, ORIGIN, DB_HOST, DB_USER, DB_NAME, DB_PASSWORD } = process.env;
 exports.node_env = String(process.env.NODE_ENV);
