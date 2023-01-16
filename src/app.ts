@@ -7,7 +7,7 @@ import hpp from 'hpp';
 import morgan from 'morgan';
 // import swaggerJSDoc from 'swagger-jsdoc';
 // import swaggerUi from 'swagger-ui-express';
-import { NODE_ENV, PORT, LOG_FORMAT, ORIGIN, CREDENTIALS } from './config';
+import { NODE_ENV, PORT, LOG_FORMAT, ORIGIN, CREDENTIALS, node_env } from './config';
 import { Routes } from './interfaces/routes.interface';
 import errorMiddleware from './middlewares/error.middleware';
 import { logger, stream } from './utils/logger';
@@ -24,7 +24,7 @@ class App {
 
   constructor(routes: Routes[]) {
     this.app = express();
-    this.env =  'development';
+    this.env =  node_env || 'production';
     this.port =  9001;
 
     this.initializeMiddlewares();
@@ -39,7 +39,6 @@ class App {
       logger.info(`======= ENV: ${this.env} =======`);
       logger.info(`🚀 App listening on the port ${this.port}`);
       logger.info(`=================================`);
-      // console.log('server started');
       
     });
   }
