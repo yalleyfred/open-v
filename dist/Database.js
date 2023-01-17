@@ -40,6 +40,7 @@ exports.Database = new sequelize_typescript_1.Sequelize(config_1.PDB_NAME, confi
     host: config_1.PDB_HOST,
     port: config_1.PDB_PORT,
     dialect: "postgres",
+    models: [__dirname + "/models"],
     dialectOptions: {
         ssl: {
             require: false,
