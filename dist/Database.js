@@ -53,7 +53,7 @@ const DB = () => {
             .then(async () => {
             console.log("connected to production database successfully!");
             try {
-                await exports.sequelize.sync();
+                await exports.Database.sync();
             }
             catch (error) {
                 console.log(error);
