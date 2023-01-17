@@ -70,7 +70,7 @@ class CourseController {
 
     
     const results = await cloudinary.v2.uploader.upload(req.file.path, {
-        folder: "image",
+        folder: "open-varsity",
         resource_type: "image"
     })
   
