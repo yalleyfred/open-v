@@ -1,90 +1,176 @@
-import { hash } from 'bcrypt';
-import { CreateCourseDto } from '../dtos/course.dto';
+import { CreateCourseDto, UpdateCourseDto } from '../dtos/course.dto';
 import { HttpException } from '../exceptions/HttpException';
 import { Course } from '../interfaces/course.interface';
-import { Cou } from '../interfaces/course.interface';
 import Courses from '../models/course.model';
-// import {LocalDB} from '../Database'
 import { isEmpty } from '../utils/util';
 import Topics from '../models/topics.model';
-
+import { logger } from '../utils/logger';
 
 class CourseService {
   public course = Courses;
 
-  public async findAllCoursesContent(userId: number): Promise<Course[]> {
-    // CourseMap(LocalDB);
-    const course: Course[] = await this.course.findAll({
-      include: [{
-        model: Topics,
-        as: 'topics'
-      }],
-      where:{
-        id: userId
-      }
-    });
-    return course;
+  public async findAllCoursesContent(courseId: number): Promise<Course[]> {
+    try {
+      const courses: Course[] = await this.course.findAll({
+        include: [{
+          model: Topics,
+          as: 'topics'
+        }],
+        where: {
+          id: courseId
+        }
+      });
+      return courses;
+    } catch (error) {
+      logger.error('Error finding courses with content:', error);
+      throw new HttpException(500, 'Failed to retrieve courses with content');
+    }
   }
 
   public async findAllCourses(): Promise<Course[]> {
-    // CourseMap(LocalDB);
-    const course: Course[] = await this.course.findAll();
-    return course;
+    try {
+      const courses: Course[] = await this.course.findAll({
+        order: [['createdAt', 'DESC']]
+      });
+      return courses;
+    } catch (error) {
+      logger.error('Error finding all courses:', error);
+      throw new HttpException(500, 'Failed to retrieve courses');
+    }
   }
 
-  public async findCourseById(userId: number): Promise<Course> {
-    // CourseMap(LocalDB);
-    const findUser: Course = await this.course.findOne({where:{id: userId}});
-    if (!findUser) throw new HttpException(409, "User doesn't exist");
-    console.log(findUser);
-    
-    return findUser;
+  public async findCourseById(courseId: number): Promise<Course> {
+    try {
+      const course: Course = await this.course.findByPk(courseId, {
+        include: [{
+          model: Topics,
+          as: 'topics'
+        }]
+      });
+      
+      if (!course) {
+        throw new HttpException(404, `Course with ID ${courseId} not found`);
+      }
+      
+      return course;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      logger.error('Error finding course by ID:', error);
+      throw new HttpException(500, 'Failed to retrieve course');
+    }
   }
 
-  public async createCourse(userData: CreateCourseDto): Promise<Cou> {
-    // CourseMap(LocalDB);
-    
-    console.log(userData);
-    
-    if (isEmpty(userData)) throw new HttpException(400, "CourseData is empty");
+  public async createCourse(userData: CreateCourseDto): Promise<Course> {
+    try {
+      if (isEmpty(userData)) {
+        throw new HttpException(400, "Course data is empty");
+      }
 
-    const findUser: Course = await this.course.findOne({
-      where: {
+      // Check if course with same title already exists
+      const existingCourse: Course = await this.course.findOne({
+        where: {
+          title: userData.title,
+        },
+      });
+      
+      if (existingCourse) {
+        throw new HttpException(409, `Course with title "${userData.title}" already exists`);
+      }
+
+      // Create the course in database
+      const newCourse: Course = await this.course.create({
         title: userData.title,
-      },
-    });
-    
-    if (findUser) throw new HttpException(409, `This Course ${userData.title} already exists`);
+        image_url: userData.image_url || '',
+        image_id: userData.image_id || '',
+        category: userData.category,
+        price: userData.price,
+        creator: userData.creator
+      });
 
-   
-    return userData;
+      return newCourse;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      logger.error('Error creating course:', error);
+      throw new HttpException(500, 'Failed to create course');
+    }
   }
 
-  public async updateCourse(userId: number, userData: CreateCourseDto): Promise<Course[]> {
-    // CourseMap(LocalDB);
-    if (isEmpty(userData)) throw new HttpException(400, "userData is empty");
+  public async updateCourse(courseId: number, userData: UpdateCourseDto): Promise<Course> {
+    try {
+      if (isEmpty(userData)) {
+        throw new HttpException(400, "Update data is empty");
+      }
 
-    const findUser: Course[] = await this.course.findAll({where:{id: userId}});
-    if (!findUser) throw new HttpException(409, "User doesn't exist");
+      // Check if course exists
+      const existingCourse: Course = await this.course.findByPk(courseId);
+      if (!existingCourse) {
+        throw new HttpException(404, `Course with ID ${courseId} not found`);
+      }
 
-    // const hashedPassword = await hash(userData.password, 10);
-    const updateUserData: Course[] = await findUser.map((user: Course) => {
-      // if (user.id === userId) user = { first_name: userData.first_name, last_name: userData.last_name, email: userData.email, password: hashedPassword, gender: userData.gender, dob: userData.dob, nationality: userData.nationality, highest_qualifications: userData.highest_qualifications, phone: userData.phone, city: userData.city, sponsor_name: userData.sponsor_name, sponsor_email: userData.sponsor_email, sponsor_phone: userData.sponsor_phone };
-      return user;
-    });
+      // If title is being updated, check for duplicates
+      if (userData.title && userData.title !== existingCourse.title) {
+        const duplicateCourse = await this.course.findOne({
+          where: {
+            title: userData.title,
+            id: { [require('sequelize').Op.ne]: courseId }
+          }
+        });
+        
+        if (duplicateCourse) {
+          throw new HttpException(409, `Course with title "${userData.title}" already exists`);
+        }
+      }
 
-    return updateUserData;
+      // Update the course
+      await this.course.update(userData, {
+        where: { id: courseId }
+      });
+
+      // Return updated course
+      const updatedCourse: Course = await this.findCourseById(courseId);
+      return updatedCourse;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      logger.error('Error updating course:', error);
+      throw new HttpException(500, 'Failed to update course');
+    }
   }
 
-  public async deleteCourse(userId: number): Promise<Course[]> {
-    // CourseMap(LocalDB)
-    const findUser: Course = await this.course.findOne({where:{id: userId}});
-    if (!findUser) throw new HttpException(409, "User doesn't exist");
+  public async deleteCourse(courseId: number): Promise<{ message: string; deletedCourse: Course }> {
+    try {
+      // Check if course exists
+      const courseToDelete: Course = await this.course.findByPk(courseId);
+      if (!courseToDelete) {
+        throw new HttpException(404, `Course with ID ${courseId} not found`);
+      }
 
+      // Delete associated topics first (if cascade delete is not set up)
+      await Topics.destroy({
+        where: { course_id: courseId }
+      });
 
-    const deleteUserData: Course[] = (await this.findAllCourses())
-    // .filter(user => user.id !== findUser.id)
-    return deleteUserData;
+      // Delete the course
+      await this.course.destroy({
+        where: { id: courseId }
+      });
+
+      return {
+        message: `Course "${courseToDelete.title}" deleted successfully`,
+        deletedCourse: courseToDelete
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      logger.error('Error deleting course:', error);
+      throw new HttpException(500, 'Failed to delete course');
+    }
   }
 }
 

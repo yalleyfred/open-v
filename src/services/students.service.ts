@@ -3,86 +3,168 @@ import { CreateStudentDto } from '../dtos/users.dto';
 import { HttpException } from '../exceptions/HttpException';
 import { StudentInt, User } from '../interfaces/student.interface';
 import Student from '../models/students.model';
-// import {LocalDB} from '../Database'
 import { isEmpty } from '../utils/util';
 
 class StudentService {
-  public users = Student;
+  private users = Student;
 
   public async findAllUser(): Promise<StudentInt[]> {
-    // AdminMap(LocalDB);
-    const users: StudentInt[] = await this.users.findAll();
-    return users;
+    try {
+      const users: StudentInt[] = await this.users.findAll({
+        attributes: { exclude: ['password'] }
+      });
+      return users;
+    } catch (error) {
+      throw new HttpException(500, 'Error retrieving students');
+    }
   }
 
   public async findUserById(userId: number): Promise<StudentInt> {
-    // AdminMap(LocalDB);
-    const findUser: StudentInt = await this.users.findOne({where:{id: userId}});
-    if (!findUser) throw new HttpException(409, "User doesn't exist");
-    console.log(findUser);
-    
-    return findUser;
+    try {
+      if (!userId || isNaN(userId) || userId <= 0) {
+        throw new HttpException(400, 'Invalid user ID');
+      }
+
+      const findUser: StudentInt = await this.users.findByPk(userId, {
+        attributes: { exclude: ['password'] }
+      });
+      
+      if (!findUser) {
+        throw new HttpException(404, "Student doesn't exist");
+      }
+      
+      return findUser;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(500, 'Error retrieving student');
+    }
   }
 
   public async createUser(userData: CreateStudentDto): Promise<StudentInt> {
-    // AdminMap(LocalDB);
-    
-    
-    if (isEmpty(userData)) throw new HttpException(400, "userData is empty");
+    try {
+      if (isEmpty(userData)) {
+        throw new HttpException(400, "Student data is empty");
+      }
 
-    const findUser: StudentInt = await this.users.findOne({
-      where: {
+      // Check if user already exists
+      const existingUser: StudentInt = await this.users.findOne({
+        where: { email: userData.email }
+      });
+      
+      if (existingUser) {
+        throw new HttpException(409, `Student with email ${userData.email} already exists`);
+      }
+
+      // Hash password with increased salt rounds for security
+      const hashedPassword = await hash(userData.password, 12);
+      
+      const createUserData = {
+        first_name: userData.first_name,
+        last_name: userData.last_name,
         email: userData.email,
-      },
-    });
-    
-    if (findUser) throw new HttpException(409, `This email ${userData.email} already exists`);
+        password: hashedPassword,
+        gender: userData.gender,
+        dob: userData.dob,
+        nationality: userData.nationality,
+        highest_qualifications: userData.highest_qualifications,
+        phone: userData.phone,
+        city: userData.city,
+        sponsor_name: userData.sponsor_name,
+        sponsor_email: userData.sponsor_email,
+        sponsor_phone: userData.sponsor_phone
+      };
 
-    const hashedPassword = await hash(userData.password, 10);
-    const createUserData: {
-      first_name: string;
-      last_name: string;
-      email: string;
-      password: string;
-      gender: string;
-      dob: string;
-      nationality: string;
-      highest_qualifications: string;
-      phone: string;
-      city: string;
-      sponsor_name: string;
-      sponsor_email: string;
-      sponsor_phone: string;
-    }= { first_name: userData.first_name, last_name: userData.last_name, email: userData.email, password: hashedPassword, gender: userData.gender, dob: userData.dob, nationality: userData.nationality, highest_qualifications: userData.highest_qualifications, phone: userData.phone, city: userData.city, sponsor_name: userData.sponsor_name, sponsor_email: userData.sponsor_email, sponsor_phone: userData.sponsor_phone };
-    await this.users.create(createUserData)
-    return createUserData;
+      const createdUser = await this.users.create(createUserData);
+      
+      // Return user without password
+      const { password, ...userWithoutPassword } = createdUser.toJSON();
+      return userWithoutPassword as StudentInt;
+
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(500, 'Error creating student');
+    }
   }
 
-  public async updateUser(userId: number, userData: CreateStudentDto): Promise<StudentInt[]> {
-    // AdminMap(LocalDB);
-    if (isEmpty(userData)) throw new HttpException(400, "userData is empty");
+  public async updateUser(userId: number, userData: Partial<CreateStudentDto>): Promise<StudentInt> {
+    try {
+      if (!userId || isNaN(userId) || userId <= 0) {
+        throw new HttpException(400, 'Invalid user ID');
+      }
 
-    const findUser: StudentInt[] = await this.users.findAll({where:{id: userId}});
-    if (!findUser) throw new HttpException(409, "User doesn't exist");
+      if (isEmpty(userData)) {
+        throw new HttpException(400, "Update data is empty");
+      }
 
-    const hashedPassword = await hash(userData.password, 10);
-    const updateUserData: StudentInt[] = await findUser.map((user: StudentInt) => {
-      // if (user.id === userId) user = { first_name: userData.first_name, last_name: userData.last_name, email: userData.email, password: hashedPassword, gender: userData.gender, dob: userData.dob, nationality: userData.nationality, highest_qualifications: userData.highest_qualifications, phone: userData.phone, city: userData.city, sponsor_name: userData.sponsor_name, sponsor_email: userData.sponsor_email, sponsor_phone: userData.sponsor_phone };
-      return user;
-    });
+      // Check if user exists
+      const existingUser = await this.users.findByPk(userId);
+      if (!existingUser) {
+        throw new HttpException(404, "Student doesn't exist");
+      }
 
-    return updateUserData;
+      // Check if email is being updated and already exists
+      if (userData.email && userData.email !== existingUser.email) {
+        const emailExists = await this.users.findOne({
+          where: { email: userData.email }
+        });
+        if (emailExists) {
+          throw new HttpException(409, `Email ${userData.email} already exists`);
+        }
+      }
+
+      const updateData: any = { ...userData };
+      
+      // Hash password if provided
+      if (userData.password) {
+        updateData.password = await hash(userData.password, 12);
+      }
+
+      await this.users.update(updateData, {
+        where: { id: userId }
+      });
+
+      // Return updated user without password
+      const updatedUser = await this.users.findByPk(userId, {
+        attributes: { exclude: ['password'] }
+      });
+
+      return updatedUser;
+
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(500, 'Error updating student');
+    }
   }
 
-  public async deleteUser(userId: number): Promise<StudentInt[]> {
-    // AdminMap(LocalDB)
-    const findUser: StudentInt = await this.users.findOne({where:{id: userId}});
-    if (!findUser) throw new HttpException(409, "User doesn't exist");
+  public async deleteUser(userId: number): Promise<{ message: string }> {
+    try {
+      if (!userId || isNaN(userId) || userId <= 0) {
+        throw new HttpException(400, 'Invalid user ID');
+      }
 
+      const findUser = await this.users.findByPk(userId);
+      if (!findUser) {
+        throw new HttpException(404, "Student doesn't exist");
+      }
 
-    const deleteUserData: StudentInt[] = (await this.findAllUser())
-    // .filter(user => user.id !== findUser.id)
-    return deleteUserData;
+      await this.users.destroy({
+        where: { id: userId }
+      });
+
+      return { message: 'Student deleted successfully' };
+
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(500, 'Error deleting student');
+    }
   }
 }
 
