@@ -16,9 +16,10 @@ class TopicRoute implements Routes {
   private initializeRoutes() {
     this.router.get(`${this.path}`, this.TopicController.getTopics);
     this.router.get(`${this.path}/:id(\\d+)`, this.TopicController.getTopicById);
-    this.router.post(`${this.path}`, validationMiddleware(CreateTopicDto, 'body'), this.TopicController.createCourse);
-    this.router.put(`${this.path}/:id(\\d+)`, validationMiddleware(CreateTopicDto, 'body', true), this.TopicController.updateCourse);
-    this.router.delete(`${this.path}/:id(\\d+)`, this.TopicController.deleteCourse);
+    this.router.get(`${this.path}/course/:courseId(\\d+)`, this.TopicController.getTopicsByCourse);
+    this.router.post(`${this.path}`, validationMiddleware(CreateTopicDto, 'body'), this.TopicController.createTopic);
+    this.router.put(`${this.path}/:id(\\d+)`, validationMiddleware(CreateTopicDto, 'body', true), this.TopicController.updateTopic);
+    this.router.delete(`${this.path}/:id(\\d+)`, this.TopicController.deleteTopic);
   }
 }
 

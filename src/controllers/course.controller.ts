@@ -1,20 +1,11 @@
 import { NextFunction, Request, Response } from 'express';
-import { CreateCourseDto } from '../dtos/course.dto';
+import { CreateCourseDto, UpdateCourseDto } from '../dtos/course.dto';
 import { Course } from '../interfaces/course.interface';
-import { Cou } from '../interfaces/course.interface';
 import CourseService from '../services/course.service';
-import Courses  from '../models/course.model';
-import cloudinary from 'cloudinary'
-
-cloudinary.v2.config({ 
-  cloud_name: 'dc9l6nzid', 
-  api_key: '655885314288553', 
-  api_secret: 'qd3DvsEHOwu4aw7hTRCiNxZJEs8' 
-});
+import cloudinary from '../utils/cloudinary';
 
 class CourseController {
   public courseService = new CourseService();
-  public course =  Courses
   public getCoursesContent = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = Number(req.params.id);
@@ -53,40 +44,27 @@ class CourseController {
     try {
       const userData: CreateCourseDto = req.body;
       
-      const createUserData: Cou = await this.courseService.createCourse(userData);
       if (!req.file) {
-        console.log("No file received");
-        //  res.send({
-        //   success: false
-        // });
-    
-      } else {
-        console.log('file received');
+        // File upload is required for course creation
+        res.status(400).json({ message: 'Course image is required' });
+        return;
+      }
 
-        //  res.send({
-        //   success: true
-        // })
-    }
-
-    
-    const results = await cloudinary.v2.uploader.upload(req.file.path, {
+      // Upload image to cloudinary
+      const results = await cloudinary.v2.uploader.upload(req.file.path, {
         folder: "open-varsity",
         resource_type: "image"
-    })
-  
-      let result = {
-        title: userData.title,
-        price: userData.price,
+      });
+
+      // Create course data with image
+      const courseData = {
+        ...userData,
         image_url: results.secure_url,
         image_id: results.public_id,
-        category: userData.category,
-        creator: userData.creator,
-      }
-      await this.course.create(result)
+      };
 
-      
-
-      res.status(201).json({ data: result, message: 'created' });
+      const createCourseData: Course = await this.courseService.createCourse(courseData);
+      res.status(201).json({ data: createCourseData, message: 'Course created successfully' });
     } catch (error) {    
       next(error);
     }
@@ -95,10 +73,10 @@ class CourseController {
   public updateCourse = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = Number(req.params.id);
-      const userData: CreateCourseDto = req.body;
-      const updateUserData: Course[] = await this.courseService.updateCourse(userId, userData);
+      const userData: UpdateCourseDto = req.body;
+      const updateUserData: Course = await this.courseService.updateCourse(userId, userData);
 
-      res.status(200).json({ data: updateUserData, message: 'updated' });
+      res.status(200).json({ data: updateUserData, message: 'Course updated successfully' });
     } catch (error) {
       next(error);
     }
@@ -107,9 +85,9 @@ class CourseController {
   public deleteCourse = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = Number(req.params.id);
-      const deleteUserData: Course[] = await this.courseService.deleteCourse(userId);
+      const deleteUserData = await this.courseService.deleteCourse(userId);
 
-      res.status(200).json({ data: deleteUserData, message: 'deleted' });
+      res.status(200).json({ data: deleteUserData, message: 'Course deleted successfully' });
     } catch (error) {
       next(error);
     }
