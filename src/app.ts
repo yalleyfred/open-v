@@ -5,11 +5,14 @@ import express from 'express';
 import helmet from 'helmet';
 import hpp from 'hpp';
 import morgan from 'morgan';
+import mongoSanitize from 'express-mongo-sanitize';
 // import swaggerJSDoc from 'swagger-jsdoc';
 // import swaggerUi from 'swagger-ui-express';
 import { NODE_ENV, PORT, LOG_FORMAT, ORIGIN, CREDENTIALS, node_env } from './config';
 import { Routes } from './interfaces/routes.interface';
 import errorMiddleware from './middlewares/error.middleware';
+import { generalLimiter } from './middlewares/rateLimiter.middleware';
+import sanitizeMiddleware from './middlewares/sanitize.middleware';
 import { logger, stream } from './utils/logger';
 import path from 'path';
 // import bodyParser from 'body-parser';
@@ -50,11 +53,28 @@ class App {
   private initializeMiddlewares() {
     this.app.use(morgan(LOG_FORMAT, { stream }));
     this.app.use(cors({ origin: ORIGIN, credentials: CREDENTIALS }));
+    this.app.use(generalLimiter); // Apply rate limiting to all requests
     this.app.use(hpp());
-    this.app.use(helmet());
+    this.app.use(helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'"],
+          imgSrc: ["'self'", "data:", "https:"],
+        },
+      },
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+      }
+    }));
     this.app.use(compression());
-    this.app.use(express.json());
-    this.app.use(express.urlencoded({ extended: true }));
+    this.app.use(express.json({ limit: '10mb' })); // Limit request body size
+    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+    this.app.use(mongoSanitize()); // Sanitize against NoSQL injection
+    this.app.use(sanitizeMiddleware); // Sanitize against XSS
     this.app.use(cookieParser());
     this.app.use(express.static(path.join(__dirname, 'client')));
     this.app.use('css', express.static(path.join(__dirname + 'client/css')));

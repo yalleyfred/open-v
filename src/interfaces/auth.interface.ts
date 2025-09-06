@@ -1,6 +1,6 @@
 import { Request } from 'express';
 import { StudentInt, User } from '../interfaces/student.interface';
-import { Cou } from './course.interface';
+import Course from '@/models/course.model';
 
 export interface DataStoredInToken {
   id: number;
@@ -20,6 +20,6 @@ export interface RequestWithUser extends Request {
 }
 
 export interface RequestCreateCourse extends Request {
-  user: Cou;
+  user: Course;
 }
 

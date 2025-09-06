@@ -8,7 +8,7 @@ import { DB } from './Database';
 import App from "./app";
 import IndexRoute from "./routes/index.route";
 
-// validateEnv();
+validateEnv();
 DB();
 
 const app = new App([ new IndexRoute(), new AuthRoute(), new AdminAuthRoute(), new CourseRoute(), new TopicRoute()]);
